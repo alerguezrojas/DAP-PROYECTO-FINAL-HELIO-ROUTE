@@ -10,6 +10,12 @@ public class SolarResultDTO {
     private double sunlightPercentage;
     private String calculationMethodUsed;
     
+    // Location Metadata
+    private String locationName;
+    private String locationDescription;
+    private String locationImageUrl;
+    private String wikiUrl;
+
     // New Fields
     private double elevation; // Added Elevation
     private double temperature;
