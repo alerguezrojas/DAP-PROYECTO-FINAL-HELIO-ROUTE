@@ -1,0 +1,115 @@
+@startuml
+class com.helioroute.calculation.domain.Location {
+- double latitude
+- double longitude
+}
+
+class com.helioroute.calculation.domain.HourlyData {
+- String time
+- double temperature
+- double windSpeed
+- double uvIndex
+- int isDay
+}
+
+interface com.helioroute.calculation.patterns.adapter.TopographyProvider {
+~ EnvironmentalData getEnvironmentData(Location)
+}
+
+interface com.helioroute.calculation.service.SolarService {
+~ UnshadowedResult getSolarInfo(Location,LocalDateTime,String)
+}
+
+class com.helioroute.calculation.domain.UnshadowedResult {
+- boolean isSunny
+- double sunlightPercentage
+- String calculationMethodUsed
+- double elevation
+- double temperature
+- double windSpeed
+- double pressure
+- double visibility
+- double freezingLevel
+- String thermalSensation
+- String clothingRecommendation
+- String safetyAlert
+- double currentUvIndex
+- String sunrise
+- String sunset
+- java.util.List<HourlyData> hourlyForecast
+}
+
+class com.helioroute.calculation.patterns.strategy.FastApproximationStrategy {
++ UnshadowedResult calculateShadow(Location,LocalDateTime,TopographyProvider)
+}
+
+class com.helioroute.calculation.patterns.adapter.ExternalTopoLibrary {
+- {static} String API_URL
+- HttpClient httpClient
++ String fetchCombinedData(double,double)
+}
+
+
+class com.helioroute.calculation.service.StandardSolarService {
+- TopographyProvider topoProvider
+- Map<String,ShadowCalculationStrategy> strategies
++ UnshadowedResult getSolarInfo(Location,LocalDateTime,String)
+}
+
+
+class com.helioroute.calculation.patterns.adapter.OpenTopoDataAdapter {
+- ExternalTopoLibrary externalLib
+- ObjectMapper mapper
++ EnvironmentalData getEnvironmentData(Location)
+- double extractValue(String,String)
+}
+
+
+class com.helioroute.calculation.patterns.proxy.CachingSolarProxy {
+- SolarService realService
+- Map<String,UnshadowedResult> cache
++ UnshadowedResult getSolarInfo(Location,LocalDateTime,String)
+}
+
+
+class com.helioroute.calculation.HelioCalculationApplication {
++ {static} void main(String[])
+}
+
+class com.helioroute.calculation.domain.EnvironmentalData {
+- double elevation
+- double temperature
+- double windSpeed
+- int weatherCode
+- double currentUvIndex
+- double pressure
+- double freezingLevel
+- double visibility
+- double snowDepth
+- String sunrise
+- String sunset
+- java.util.List<HourlyData> hourlyForecast
+}
+
+interface com.helioroute.calculation.patterns.strategy.ShadowCalculationStrategy {
+~ UnshadowedResult calculateShadow(Location,LocalDateTime,TopographyProvider)
+}
+
+class com.helioroute.calculation.patterns.strategy.PreciseRayTracingStrategy {
++ UnshadowedResult calculateShadow(Location,LocalDateTime,TopographyProvider)
+}
+
+class com.helioroute.calculation.controller.CalculationController {
+- SolarService solarService
++ UnshadowedResult calculate(double,double,LocalDateTime,String)
+}
+
+
+
+
+com.helioroute.calculation.patterns.strategy.ShadowCalculationStrategy <|.. com.helioroute.calculation.patterns.strategy.FastApproximationStrategy
+com.helioroute.calculation.service.SolarService <|.. com.helioroute.calculation.service.StandardSolarService
+com.helioroute.calculation.patterns.adapter.TopographyProvider <|.. com.helioroute.calculation.patterns.adapter.OpenTopoDataAdapter
+com.helioroute.calculation.service.SolarService <|.. com.helioroute.calculation.patterns.proxy.CachingSolarProxy
+com.helioroute.calculation.patterns.strategy.ShadowCalculationStrategy <|.. com.helioroute.calculation.patterns.strategy.PreciseRayTracingStrategy
+@enduml

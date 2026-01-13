@@ -1,0 +1,107 @@
+@startuml
+!theme plain
+skinparam componentStyle uml2
+skinparam linetype ortho
+
+' Estilos visuales para modernizar el diagrama
+skinparam component {
+    BackgroundColor<<Frontend>> #E3F2FD
+    BorderColor<<Frontend>> #1E88E5
+    BackgroundColor<<Backend>> #E8F5E9
+    BorderColor<<Backend>> #43A047
+    BackgroundColor<<External>> #F3E5F5
+    BorderColor<<External>> #8E24AA
+}
+skinparam interface {
+    BackgroundColor Black
+    BorderColor Black
+}
+skinparam package {
+    BackgroundColor White
+    BorderColor Gray
+    FontColor DimGray
+}
+
+title Diagrama de Componentes - Sistema HelioRoute
+
+' --- ACTORES Y SISTEMAS EXTERNOS ---
+actor "Usuario\n(Navegador Web)" as User
+component "Open-Meteo API" as OpenMeteo <<External>>
+
+' --- MÓDULO 1: FRONTEND ---
+package "Helio Web Interface\n[Spring Boot + Thymeleaf]" as WebPackage {
+
+    component "PageController" as PageCtrl <<Frontend>>
+    component "Thymeleaf Templates" as Templates <<Frontend>>
+    component "BackendClientService" as BackendClient <<Frontend>>
+
+    note right of BackendClient
+        Cliente HTTP
+        (RestTemplate/WebClient)
+    end note
+}
+
+' --- MÓDULO 2: BACKEND ---
+package "Helio Calculation Service\n[Spring Boot API]" as BackendPackage {
+
+    component "CalculationController" as CalcCtrl <<Backend>>
+    component "SolarService" as SolarSvc <<Backend>>
+
+    ' Patrones de Diseño
+    component "CachingSolarProxy" as Proxy <<Backend>> <<Proxy Pattern>>
+    component "OpenTopoDataAdapter" as Adapter <<Backend>> <<Adapter Pattern>>
+
+    ' Estrategia de Cálculo
+    package "Strategies" {
+        interface "ShadowCalculationStrategy" as IStrategy
+        component "One-Step Implementation" as Strat1 <<Backend>>
+        component "Ray-Tracing Implementation" as Strat2 <<Backend>>
+    }
+}
+
+' --- DEFINICIÓN DE INTERFACES ---
+
+' Interface UI
+interface "HTTPS / HTML" as UI_Int
+UI_Int - [PageCtrl]
+
+' Interface Backend
+interface "REST API (Port 8084)" as API_Int
+API_Int - [CalcCtrl]
+
+' Interface Externa
+interface "JSON / HTTP GET" as Ext_Int
+Ext_Int - [OpenMeteo]
+
+' --- RELACIONES Y FLUJO ---
+
+' 1. Usuario al Frontend
+User ..> UI_Int : Usa
+[PageCtrl] ..> [Templates] : Renderiza vistas
+[PageCtrl] --> [BackendClient] : Delega petición de datos
+
+' 2. Frontend al Backend
+[BackendClient] ..> API_Int : JSON Request
+[CalcCtrl] --> [SolarSvc] : Invoca lógica de negocio
+
+' 3. Lógica interna del Backend (Proxy y Adapter)
+[SolarSvc] --> [Proxy] : Solicita datos solares
+[Proxy] --> [Adapter] : Pide datos si no hay caché
+note right of Proxy
+    Intercepta llamada
+    para verificar caché interna
+end note
+
+' 4. Backend a API Externa
+[Adapter] ..> Ext_Int : Transforma y solicita
+note right of Adapter
+    Adapta respuesta compleja
+    al dominio interno
+end note
+
+' 5. Relación Strategy
+[SolarSvc] ..> IStrategy : Usa interfaz
+IStrategy <|-- [Strat1]
+IStrategy <|-- [Strat2]
+
+@enduml
