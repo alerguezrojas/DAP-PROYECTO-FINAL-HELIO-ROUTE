@@ -434,7 +434,7 @@
                         </a>
                     </div>
                     <div class="col-md-4 text-center" th:if="${result.locationImageUrl != null}">
-                        <img th:src="${result.locationImageUrl}" class="img-fluid rounded-3 shadow" alt="Imagen de la ubicación" style="max-height: 250px; object-fit: cover; width: 100%;">
+                        <img id="wiki-image" th:src="${result.locationImageUrl}" class="img-fluid rounded-3 shadow" alt="Imagen de la ubicación" style="max-height: 250px; object-fit: cover; width: 100%;" crossorigin="anonymous">
                     </div>
                 </div>
             </div>
@@ -754,136 +754,313 @@
 
     <!-- Chart Configuration -->
     <script th:inline="javascript">
-        // Export PDF Function - Clean Document Version
+        // Export PDF Function - The "Bulletproof" Strategy + Chart + Wiki Image + Better Pagination
+        // Tries to find jsPDF directly. If not, hijacks html2pdf worker.
         function exportPFD() {
-            const resultData = {
-                locationName: [[${result.locationName}]] || 'Ubicación desconocida',
-                lat: [[${lat}]],
-                lon: [[${lon}]],
-                time: [[${time}]],
-                elevation: [[${result.elevation}]],
-                temperature: [[${result.temperature}]],
-                thermalSensation: [[${result.thermalSensation}]],
-                windSpeed: [[${result.windSpeed}]],
-                currentUvIndex: [[${result.currentUvIndex}]],
-                sunny: [[${result.sunny}]],
-                freezingLevel: [[${result.freezingLevel}]],
-                visibility: [[${result.visibility}]],
-                pressure: [[${result.pressure}]],
-                sunrise: [[${result.sunrise}]],
-                sunset: [[${result.sunset}]],
-                safetyAlert: [[${result.safetyAlert}]],
-                clothingRecommendation: [[${result.clothingRecommendation}]],
-                wikiDescription: [[${result.locationDescription}]],
-                wikiImageUrl: [[${result.locationImageUrl}]],
-                wikiUrl: [[${result.wikiUrl}]]
-            };
+            try {
+                // 1. Gather Data
+                const resultData = {
+                    locationName: [[${result.locationName}]] || 'Ubicación desconocida',
+                    lat: [[${lat}]],
+                    lon: [[${lon}]],
+                    time: [[${time}]],
+                    elevation: [[${result.elevation}]],
+                    temperature: [[${result.temperature}]],
+                    thermalSensation: [[${result.thermalSensation}]],
+                    windSpeed: [[${result.windSpeed}]],
+                    currentUvIndex: [[${result.currentUvIndex}]],
+                    sunny: [[${result.sunny}]],
+                    freezingLevel: [[${result.freezingLevel}]],
+                    visibility: [[${result.visibility}]],
+                    pressure: [[${result.pressure}]],
+                    sunrise: [[${result.sunrise}]],
+                    sunset: [[${result.sunset}]],
+                    safetyAlert: [[${result.safetyAlert}]],
+                    clothingRecommendation: [[${result.clothingRecommendation}]],
+                    wikiDescription: [[${result.locationDescription}]],
+                    wikiUrl: [[${result.wikiUrl}]],
+                    wikiImageUrl: [[${result.locationImageUrl}]]
+                };
 
-            // Populate PDF clean version
-            document.getElementById('pdf-location-name').textContent = resultData.locationName;
-            document.getElementById('pdf-coordinates').textContent = `Coordenadas: ${resultData.lat.toFixed(4)}°, ${resultData.lon.toFixed(4)}°`;
-            document.getElementById('pdf-date').textContent = `Fecha de análisis: ${resultData.time}`;
-            
-            // Wiki section
-            const wikiSection = document.getElementById('pdf-wiki-section');
-            if (resultData.wikiDescription) {
-                document.getElementById('pdf-wiki-desc').textContent = resultData.wikiDescription;
-                document.getElementById('pdf-wiki-url').textContent = resultData.wikiUrl ? `Más información: ${resultData.wikiUrl}` : '';
-                if (resultData.wikiImageUrl) {
-                    document.getElementById('pdf-wiki-img').src = resultData.wikiImageUrl;
-                    document.getElementById('pdf-wiki-img').style.display = 'block';
+                // 2. Capture Chart Image (Helper)
+                const captureElement = (id) => {
+                    const canvas = document.getElementById(id);
+                    if (!canvas) return null;
+                    try {
+                        const w = canvas.width || canvas.clientWidth;
+                        const h = canvas.height || canvas.clientHeight;
+                        
+                        // Treat invalid dimensions
+                        if(!w || !h) return null;
+
+                        const composite = document.createElement('canvas');
+                        composite.width = w;
+                        composite.height = h;
+                        const ctx = composite.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, w, h);
+                        
+                        if (canvas.tagName === 'IMG') {
+                            ctx.drawImage(canvas, 0, 0, w, h);
+                        } else {
+                            ctx.drawImage(canvas, 0, 0);
+                        }
+                        return composite.toDataURL('image/jpeg', 0.95);
+                    } catch (err) {
+                        console.warn(`Capture for ${id} failed:`, err);
+                        return null;
+                    }
+                };
+
+                // Capture Assets
+                const chartImgData = captureElement('weatherChart');
+                
+                // Attempt to capture Wiki Image from DOM if it exists and is loaded
+                // Note: Image must have crossorigin="anonymous" if external to work consistently
+                const wikiImgElement = document.getElementById('wiki-image');
+                let wikiImgData = null;
+                if (wikiImgElement && wikiImgElement.complete) {
+                     wikiImgData = captureElement('wiki-image');
                 }
-                wikiSection.style.display = 'block';
-            } else {
-                wikiSection.style.display = 'none';
-            }
-            
-            // Metrics
-            document.getElementById('pdf-elevation').textContent = `${resultData.elevation} m`;
-            document.getElementById('pdf-temperature').textContent = `${resultData.temperature} °C`;
-            document.getElementById('pdf-thermal').textContent = resultData.thermalSensation;
-            document.getElementById('pdf-wind').textContent = `${resultData.windSpeed} km/h`;
-            document.getElementById('pdf-uv').textContent = resultData.currentUvIndex;
-            
-            let uvDesc = 'Bajo';
-            if (resultData.currentUvIndex > 8) uvDesc = 'Muy Alto - Protección máxima';
-            else if (resultData.currentUvIndex > 5) uvDesc = 'Alto - Protección necesaria';
-            else if (resultData.currentUvIndex > 2) uvDesc = 'Moderado';
-            document.getElementById('pdf-uv-desc').textContent = uvDesc;
-            
-            document.getElementById('pdf-sunny').textContent = resultData.sunny ? 'Despejado ☀️' : 'Nublado ☁️';
-            
-            // Mountain conditions
-            document.getElementById('pdf-freezing').textContent = `${resultData.freezingLevel} m`;
-            const freezingAlert = resultData.elevation > resultData.freezingLevel ? '⚠️ Por encima de línea de congelación' : 'Normal';
-            document.getElementById('pdf-freezing-alert').textContent = freezingAlert;
-            
-            document.getElementById('pdf-visibility').textContent = `${(resultData.visibility / 1000).toFixed(1)} km`;
-            const visAlert = resultData.visibility < 1000 ? '⚠️ Visibilidad reducida' : 'Buena';
-            document.getElementById('pdf-visibility-alert').textContent = visAlert;
-            
-            document.getElementById('pdf-pressure').textContent = `${resultData.pressure} hPa`;
-            
-            // Solar
-            document.getElementById('pdf-sunrise').textContent = resultData.sunrise;
-            document.getElementById('pdf-sunset').textContent = resultData.sunset;
-            
-            // Safety
-            document.getElementById('pdf-safety-text').textContent = resultData.safetyAlert;
-            const safetyDiv = document.getElementById('pdf-safety-alert');
-            if (resultData.safetyAlert.includes('ALTO')) {
-                safetyDiv.style.borderColor = '#ef4444';
-                safetyDiv.style.background = '#fef2f2';
-            } else if (resultData.safetyAlert.includes('Moderate')) {
-                safetyDiv.style.borderColor = '#f59e0b';
-                safetyDiv.style.background = '#fffbeb';
-            } else {
-                safetyDiv.style.borderColor = '#10b981';
-                safetyDiv.style.background = '#f0fdf4';
-            }
-            
-            // Recommendation
-            document.getElementById('pdf-rec-text').textContent = resultData.clothingRecommendation;
-            
-            // Generation date
-            document.getElementById('pdf-gen-date').textContent = new Date().toLocaleString('es-ES');
-            
-            // Export
-            const element = document.getElementById('pdf-clean-version');
-            element.style.display = 'block';
-            element.style.position = 'relative';
-            element.style.zIndex = '9999';
-            
-            const opt = {
-              margin:       10,
-              filename:     'HelioRoute-Analisis-' + resultData.locationName.replace(/\s+/g, '-') + '.pdf',
-              image:        { type: 'jpeg', quality: 0.98 },
-              html2canvas:  { 
-                  scale: 2,
-                  useCORS: true,
-                  logging: true,
-                  backgroundColor: '#ffffff',
-                  letterRendering: true,
-                  allowTaint: false,
-                  removeContainer: false
-              },
-              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-              pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
-            };
 
-            console.log('Starting PDF generation...');
-            html2pdf().set(opt).from(element).save().then(() => {
-                console.log('PDF generated successfully!');
-                element.style.display = 'none';
-                element.style.position = '';
-                element.style.zIndex = '';
-            }).catch(err => {
-                console.error('PDF generation error:', err);
-                element.style.display = 'none';
-                element.style.position = '';
-                element.style.zIndex = '';
-                alert('Error al generar PDF: ' + err.message);
-            });
+                // --- PDF PAINTER FUNCTION ---
+                // Defines exactly what goes on the paper
+                const paintPDF = (doc) => {
+                     // HARDCODED A4 SPECS (mm) to prevent Unit mix-ups (Points vs MM)
+                     // If the doc thinks it's Points (595), we force our calculations to MM logic
+                     // and hope the doc was initialized in MM. If not, this safeguards layout partially
+                     // but ideal is doc initialized in MM.
+                     const margin = 20; 
+                     let y = 20;
+                     // Force standard A4 size in mm
+                     const pageWidth = 210; 
+                     const pageHeight = 297; 
+                     
+                     // Helper: Check Page Break
+                     const checkPageBreak = (heightNeeded) => {
+                         if (y + heightNeeded > pageHeight - margin) {
+                             doc.addPage();
+                             y = 20;
+                             return true;
+                         }
+                         return false;
+                     };
+
+                     // Reset styles
+                     doc.setFont("helvetica", "bold");
+                     doc.setFontSize(22);
+                     doc.setTextColor(40, 60, 150);
+                     doc.text("HelioRoute: Informe Técnico", margin, y);
+                     
+                     y += 15;
+                     doc.setLineWidth(0.5);
+                     doc.setDrawColor(200);
+                     doc.line(margin, y, pageWidth - margin, y);
+                     y += 10;
+                     
+                     // Helper for lines
+                     const addLine = (label, value) => {
+                         checkPageBreak(10);
+                         doc.setFont("helvetica", "bold");
+                         doc.setFontSize(11);
+                         doc.setTextColor(50);
+                         doc.text(label + ": ", margin, y);
+                         
+                         const labelWidth = doc.getTextWidth(label + ": ");
+                         doc.setFont("helvetica", "normal");
+                         doc.setTextColor(0);
+                         if (value === null || value === undefined) value = "N/A";
+                         doc.text(String(value), margin + labelWidth, y);
+                         y += 7;
+                     };
+                     
+                     const addSection = (title) => {
+                         checkPageBreak(15);
+                         y += 5;
+                         doc.setFont("helvetica", "bold");
+                         doc.setFontSize(14);
+                         doc.setTextColor(0);
+                         doc.text(title, margin, y);
+                         y += 8;
+                     };
+
+                     // CONTENT
+                     addSection("1. Ubicación y Fecha");
+                     addLine("Lugar", resultData.locationName);
+                     addLine("Coordenadas", `${Number(resultData.lat).toFixed(4)}, ${Number(resultData.lon).toFixed(4)}`);
+                     addLine("Altitud", `${resultData.elevation} m`);
+                     addLine("Fecha Informe", resultData.time);
+
+                     addSection("2. Meteorología");
+                     addLine("Temperatura", `${resultData.temperature} °C`);
+                     addLine("Sensación Térmica", resultData.thermalSensation);
+                     addLine("Viento", `${resultData.windSpeed} km/h`);
+                     addLine("Presión", `${resultData.pressure} hPa`);
+                     addLine("Visibilidad", `${resultData.visibility} m`);
+                     addLine("Cota de Nieve", `${resultData.freezingLevel} m`);
+
+                     addSection("3. Datos Solares");
+                     addLine("Condición", resultData.sunny ? "Soleado" : "Nublado/Sombra");
+                     addLine("Índice UV", resultData.currentUvIndex);
+                     addLine("Amanecer", resultData.sunrise);
+                     addLine("Atardecer", resultData.sunset);
+
+                     // --- CHART SECTION ---
+                     if (chartImgData) {
+                         const imgHeight = 60; 
+                         checkPageBreak(imgHeight + 20);
+                         
+                         doc.setFont("helvetica", "bold");
+                         doc.setFontSize(14);
+                         doc.setTextColor(0);
+                         doc.text("4. Gráfico de Previsión (24h)", margin, y);
+                         y += 8;
+                         
+                         const imgWidth = pageWidth - (margin * 2);
+                         doc.addImage(chartImgData, 'JPEG', margin, y, imgWidth, imgHeight);
+                         y += imgHeight + 10;
+                     }
+
+                     addSection("5. Seguridad y Recomendaciones");
+                     
+                     // Alert Box
+                     checkPageBreak(40);
+                     
+                     doc.setFillColor(255, 240, 240);
+                     doc.rect(margin, y, pageWidth - (margin*2), 20, 'F');
+                     y += 5;
+                     
+                     doc.setFont("helvetica", "bold");
+                     doc.setTextColor(200, 0, 0);
+                     doc.setFontSize(10);
+                     const safeText = doc.splitTextToSize("ALERTA: " + resultData.safetyAlert, pageWidth - (margin*2) - 10);
+                     doc.text(safeText, margin + 5, y + 5);
+                     
+                     y += 25;
+                     
+                     doc.setFont("helvetica", "italic");
+                     doc.setTextColor(0);
+                     doc.setFontSize(11);
+                     // Changed width to include extra buffer (-20) to prevent overflow
+                     const recText = doc.splitTextToSize("Equipo: " + resultData.clothingRecommendation, pageWidth - (margin*2) - 20);
+                     doc.text(recText, margin, y);
+                     
+                     y += (recText.length * 7) + 10;
+                     
+                     // Wiki
+                     if (resultData.wikiDescription) {
+                         checkPageBreak(50);
+                         addSection("6. Contexto (Wikipedia)");
+                         
+                         // Image (Left or Top)
+                         if (wikiImgData) {
+                             // Let's put image on top if available
+                             const wImgH = 50; 
+                             checkPageBreak(wImgH + 20);
+                             const wImgW = 80; // Fixed width for wiki image
+                             
+                             // Draw image
+                             doc.addImage(wikiImgData, 'JPEG', margin, y, wImgW, wImgH);
+                             
+                             // Move cursor down
+                             y += wImgH + 5; 
+                         }
+                         
+                         // Reset font to Normal (not Italic) and ensure Helvetica
+                         // This fixes width calculation issues with Italic fonts
+                         doc.setFont("helvetica", "normal"); 
+                         doc.setFontSize(10);
+                         doc.setTextColor(60); // Slightly darker for readability
+                         
+                         // Manual Pagination Loop for Text
+                         // Fixed Width of 120mm - EXTREMELY SAFE MARGIN
+                         // Page is 210mm. Left margin 20mm. Text 120mm. 
+                         // Ends at 140mm. Right margin becomes 70mm.
+                         // This makes a narrow central column that cannot overflow.
+                         const textWidth = 120; 
+                         const fullWikiText = doc.splitTextToSize(resultData.wikiDescription, textWidth);
+                         
+                         // We iterate line by line to handle page breaks gracefully
+                         const lineHeight = 5;
+                         
+                         for (let i = 0; i < fullWikiText.length; i++) {
+                             if (y + lineHeight > pageHeight - margin) {
+                                 doc.addPage();
+                                 y = 20; // Restart top
+                             }
+                             doc.text(fullWikiText[i], margin, y);
+                             y += lineHeight;
+                         }
+                         
+                         y += 5;
+                         
+                         if (resultData.wikiUrl) {
+                            checkPageBreak(10);
+                            doc.setTextColor(0, 0, 255);
+                            doc.textWithLink("Leer más en Wikipedia", margin, y, { url: resultData.wikiUrl });
+                        }
+                     }
+                     
+                     // Page Numbers
+                     const pageCount = doc.internal.getNumberOfPages();
+                     for(let i = 1; i <= pageCount; i++) {
+                        doc.setPage(i);
+                        doc.setFontSize(8);
+                        doc.setTextColor(150);
+                        doc.text(`Pág ${i} de ${pageCount} | Generado: ${new Date().toLocaleString()}`, margin, 285);
+                    }
+                };
+
+                // --- EXECUTION STRATEGY ---
+                const filename = 'HelioRoute_' + resultData.locationName.replace(/[^a-z0-9]/gi, '_') + '.pdf';
+                let pdfEngine = null;
+                
+                // Explicit options to avoid unit confusion
+                const pdfOptions = { orientation: 'p', unit: 'mm', format: 'a4' };
+
+                // Priority 1: Window.jspdf (Newer versions)
+                if (window.jspdf && window.jspdf.jsPDF) {
+                    console.log("Using window.jspdf.jsPDF");
+                    pdfEngine = new window.jspdf.jsPDF(pdfOptions);
+                } 
+                // Priority 2: Window.jsPDF (Older versions/Globals)
+                else if (window.jsPDF) {
+                    console.log("Using window.jsPDF");
+                    pdfEngine = new window.jsPDF(pdfOptions);
+                }
+
+                if (pdfEngine) {
+                    // Direct approach
+                    paintPDF(pdfEngine);
+                    pdfEngine.save(filename);
+                } else {
+                    // Priority 3: html2pdf wrapper
+                    console.log("Using html2pdf worker fallback");
+                    const dummy = document.createElement('div');
+                    dummy.innerHTML = "x"; // Ensure content exists
+                    
+                    const opt = {
+                        margin: 10,
+                        jsPDF: { unit: 'mm', format: 'a4' }
+                    };
+                    
+                    html2pdf().from(dummy).set(opt).toPdf().get('pdf').then(function(doc) {
+                        // IMPORTANT: Add a clean page to ensure no canvas artifacts
+                        doc.addPage();
+                        doc.setPage(2);
+                        doc.deletePage(1); // Remove the dummy page
+                        
+                        paintPDF(doc);
+                        doc.save(filename);
+                    }).catch(e => {
+                        alert("Error generando PDF: " + e.message);
+                    });
+                }
+
+            } catch (e) {
+                console.error("Setup error:", e);
+                alert("Error preparando datos: " + e.message);
+            }
         }
 
         // Initialize Map

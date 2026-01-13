@@ -17,7 +17,7 @@ public class ExternalTopoLibrary {
     public ExternalTopoLibrary() {
         this.httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_2)
-                .connectTimeout(Duration.ofSeconds(5))
+                .connectTimeout(Duration.ofSeconds(10))
                 .build();
     }
 
@@ -37,7 +37,7 @@ public class ExternalTopoLibrary {
             
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(uriStr))
-                    .timeout(Duration.ofSeconds(5))
+                    .timeout(Duration.ofSeconds(10))
                     .GET()
                     .build();
 
