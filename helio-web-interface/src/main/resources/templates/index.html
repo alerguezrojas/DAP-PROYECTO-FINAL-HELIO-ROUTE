@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HelioRoute — Análisis de Condiciones de Montaña</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --color-bg: #0a0e27;
+            --color-bg-light: #141a3d;
+            --color-primary: #4f46e5;
+            --color-accent: #06b6d4;
+            --color-text: #e2e8f0;
+            --color-text-muted: #94a3b8;
+            --color-surface: #1e293b;
+            --color-border: rgba(148, 163, 184, 0.1);
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+        }
+        
+        * { box-sizing: border-box; }
+        
+        body {
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f4a 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--color-text);
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(79, 70, 229, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(6, 182, 212, 0.06) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .container { position: relative; z-index: 1; }
+        
+        .hero-section {
+            padding: 4rem 0 3rem;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+        
+        .hero-section::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+            border-radius: 2px;
+        }
+        
+        .hero-title {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, var(--color-accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+        
+        .hero-subtitle {
+            font-size: 1.125rem;
+            color: var(--color-text-muted);
+            font-weight: 300;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .glass-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--color-border);
+            border-radius: 20px;
+            box-shadow: var(--shadow-lg);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+        
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px rgba(0, 0, 0, 0.6);
+            border-color: rgba(148, 163, 184, 0.2);
+        }
+        
+        .card-header-custom {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--color-border);
+            background: rgba(79, 70, 229, 0.05);
+        }
+        
+        .card-header-custom h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+            color: var(--color-text);
+        }
+        
+        #map { 
+            height: 450px;
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            box-shadow: var(--shadow-md);
+            z-index: 1;
+        }
+        
+        .form-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--color-text);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .form-control, .input-group-text {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--color-border);
+            color: var(--color-text);
+            padding: 0.75rem 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .form-control:focus {
+            background: rgba(15, 23, 42, 0.8);
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+            color: var(--color-text);
+        }
+        
+        .form-control[readonly] {
+            background: rgba(15, 23, 42, 0.4);
+            cursor: not-allowed;
+        }
+        
+        .strategy-option {
+            background: rgba(15, 23, 42, 0.4);
+            border: 2px solid var(--color-border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .strategy-option:hover {
+            border-color: rgba(79, 70, 229, 0.5);
+            background: rgba(79, 70, 229, 0.05);
+        }
+        
+        .strategy-option .strategy-content {
+            color: var(--color-text);
+        }
+        
+        .strategy-option input[type="radio"]:checked ~ .strategy-content {
+            color: var(--color-text);
+        }
+        
+        .strategy-option input[type="radio"]:checked ~ label .strategy-content {
+            color: var(--color-text);
+        }
+        
+        .strategy-option .form-check-label {
+            color: var(--color-text);
+        }
+        
+        .strategy-option .text-muted {
+            color: var(--color-text-muted) !important;
+        }
+        
+        .strategy-option input[type="radio"]:checked + label {
+            border-left: 4px solid var(--color-primary);
+            padding-left: 1rem;
+        }
+        
+        .strategy-option .form-check-input:checked {
+            background-color: var(--color-primary);
+            border-color: var(--color-primary);
+        }
+        
+        .strategy-icon {
+            width: 24px;
+            height: 24px;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 0.5rem;
+        }
+        
+        .btn-analyze {
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+            border: none;
+            padding: 1rem 2.5rem;
+            font-weight: 600;
+            font-size: 1.1rem;
+            border-radius: 12px;
+            color: white;
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-analyze::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn-analyze:hover::before {
+            left: 100%;
+        }
+        
+        .btn-analyze:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5);
+        }
+        
+        .btn-analyze:active {
+            transform: translateY(0);
+        }
+        
+        .dropdown-toggle {
+            background: rgba(79, 70, 229, 0.1);
+            border: 1px solid var(--color-primary);
+            color: var(--color-text);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+        
+        .dropdown-toggle:hover {
+            background: rgba(79, 70, 229, 0.2);
+            border-color: var(--color-accent);
+        }
+        
+        .dropdown-menu {
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            padding: 0.5rem;
+        }
+        
+        .dropdown-item {
+            color: var(--color-text);
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.25rem;
+            transition: all 0.2s;
+        }
+        
+        .dropdown-item:hover {
+            background: rgba(79, 70, 229, 0.2);
+            color: var(--color-accent);
+        }
+        
+        .dropdown-divider {
+            border-color: var(--color-border);
+        }
+        
+        .info-pill {
+            display: inline-block;
+            padding: 0.35rem 0.75rem;
+            background: rgba(6, 182, 212, 0.1);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: var(--color-accent);
+            margin-top: 0.5rem;
+        }
+        
+        footer {
+            padding: 2rem 0;
+            text-align: center;
+            color: var(--color-text-muted);
+            font-size: 0.875rem;
+            border-top: 1px solid var(--color-border);
+            margin-top: 4rem;
+        }
+        
+        .spinner-border-sm {
+            width: 1.2rem;
+            height: 1.2rem;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .mountain-icon {
+            animation: float 3s ease-in-out infinite;
+            display: inline-block;
+        }
+        
+        .icon-mountain {
+            width: 80px;
+            height: 80px;
+            fill: none;
+            stroke: var(--color-accent);
+            stroke-width: 1.5;
+            filter: drop-shadow(0 0 20px rgba(6, 182, 212, 0.3));
+        }
+        
+        .icon-location, .icon-mountains, .icon-calendar, .icon-altitude {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        
+        .icon-destination {
+            width: 16px;
+            height: 16px;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="hero-section text-center">
+        <div class="container">
+            <div class="mountain-icon" style="margin-bottom: 1rem;">
+                <svg class="icon-mountain" viewBox="0 0 24 24">
+                    <path d="M3 20h18L13.5 5 9 13l-2.5-3L3 20z"/>
+                    <path d="M6 20l2.5-3L11 20"/>
+                    <path d="M9 13l2-3 2.5 3.5"/>
+                </svg>
+            </div>
+            <h1 class="hero-title">HelioRoute</h1>
+            <p class="hero-subtitle">Análisis técnico de condiciones meteorológicas y de seguridad para expediciones de alta montaña</p>
+        </div>
+    </div>
+
+    <div class="container mb-5">
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="glass-card">
+                    <div class="card-header-custom d-flex justify-content-between align-items-center">
+                        <h3 class="m-0">Localización del Análisis</h3>
+                        <div class="dropdown">
+                            <button class="dropdown-toggle" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
+                                <svg class="icon-destination" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                </svg>
+                                Destinos Destacados
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton1">
+                                <li><a class="dropdown-item" href="#" onclick="setLoc(37.050, -3.311); return false;">
+                                    <svg class="icon-destination" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 20h18L13.5 5 9 13l-2.5-3L3 20z"/>
+                                    </svg>
+                                    Mulhacén — Sierra Nevada
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" onclick="setLoc(42.632, 0.658); return false;">
+                                    <svg class="icon-destination" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 20h18L13.5 5 9 13l-2.5-3L3 20z"/>
+                                    </svg>
+                                    Aneto — Pirineos
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" onclick="setLoc(28.272, -16.642); return false;">
+                                    <svg class="icon-destination" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                        <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+                                    </svg>
+                                    Teide — Tenerife
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" onclick="setLoc(40.783, -3.975); return false;">
+                                    <svg class="icon-destination" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 20h18L13.5 5 9 13l-2.5-3L3 20z"/>
+                                    </svg>
+                                    Peñalara — Guadarrama
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="#" onclick="setLoc(27.988, 86.925); return false;">
+                                    <svg class="icon-destination" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 20h18L13.5 5 9 13l-2.5-3L3 20z"/>
+                                    </svg>
+                                    Everest — Himalaya
+                                </a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4">
+                        <div class="info-pill mb-3">
+                            <svg style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M12 16v-4m0-4h.01"/>
+                            </svg>
+                            Haz clic en el mapa o arrastra el marcador para seleccionar coordenadas
+                        </div>
+                        <div id="map"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-5">
+                <div class="glass-card">
+                    <div class="card-header-custom">
+                        <h3 class="m-0">Parámetros de Análisis</h3>
+                    </div>
+                    
+                    <div class="p-4">
+                    
+                    <form action="/check" method="post" id="calcForm">
+                        <div class="mb-4">
+                            <label class="form-label">Coordenadas Geográficas</label>
+                            <div class="input-group">
+                                <span class="input-group-text">LAT</span>
+                                <input type="number" step="any" class="form-control" name="lat" id="lat" value="40.4168" required readonly>
+                                <span class="input-group-text">LON</span>
+                                <input type="number" step="any" class="form-control" name="lon" id="lon" value="-3.7038" required readonly>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">Fecha y Hora del Análisis</label>
+                            <input type="datetime-local" class="form-control" name="timeStr" required id="dateInput">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">Método de Cálculo</label>
+                            <div class="strategy-option">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="strategy" id="fast" value="fast" checked>
+                                    <label class="form-check-label w-100" for="fast">
+                                        <div class="strategy-content">
+                                                <div class="fw-semibold mb-1">
+                                                    <svg class="strategy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                                    </svg>
+                                                    Análisis Rápido
+                                                </div>
+                                                <small class="text-muted">Estimación heurística basada en parámetros solares</small>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="strategy-option">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="strategy" id="precise" value="precise">
+                                        <label class="form-check-label w-100" for="precise">
+                                            <div class="strategy-content">
+                                                <div class="fw-semibold mb-1">
+                                                    <svg class="strategy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <circle cx="12" cy="12" r="10"></circle>
+                                                        <circle cx="12" cy="12" r="6"></circle>
+                                                        <circle cx="12" cy="12" r="2"></circle>
+                                                    </svg>
+                                                    Análisis Preciso
+                                                </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn-analyze" id="submitBtn">
+                                <span id="btnText">Iniciar Análisis</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p class="mb-0">HelioRoute — Sistema de Análisis Meteorológico para Montañismo</p>
+            <p class="mb-0" style="font-size: 0.75rem; opacity: 0.6;">Arquitectura de Microservicios · Patrones de Diseño</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Init Map
+        var map = L.map('map').setView([40.4168, -3.7038], 6);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var marker = L.marker([40.4168, -3.7038], {draggable: true}).addTo(map);
+
+        function updateInputs(lat, lng) {
+            document.getElementById('lat').value = lat.toFixed(6);
+            document.getElementById('lon').value = lng.toFixed(6);
+        }
+        
+        // Function called by shortcut buttons
+        function setLoc(lat, lng) {
+            var newLatLng = new L.LatLng(lat, lng);
+            marker.setLatLng(newLatLng);
+            map.setView(newLatLng, 13);
+            updateInputs(lat, lng);
+        }
+
+        map.on('click', function(e) {
+            marker.setLatLng(e.latlng);
+            updateInputs(e.latlng.lat, e.latlng.lng);
+        });
+
+        marker.on('dragend', function(e) {
+            var position = marker.getLatLng();
+            updateInputs(position.lat, position.lng);
+        });
+
+        // Set default datetime to now
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('dateInput').value = now.toISOString().slice(0,16);
+
+        // Loading state
+        document.getElementById('calcForm').addEventListener('submit', function() {
+            const btn = document.getElementById('submitBtn');
+            const btnText = document.getElementById('btnText');
+            btnText.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Procesando análisis...';
+            btn.disabled = true;
+        });
+    </script>
+</body>
+</html>

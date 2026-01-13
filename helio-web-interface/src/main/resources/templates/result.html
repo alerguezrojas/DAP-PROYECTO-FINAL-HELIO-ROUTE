@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informe de Análisis — HelioRoute</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --color-bg: #0a0e27;
+            --color-primary: #4f46e5;
+            --color-accent: #06b6d4;
+            --color-success: #10b981;
+            --color-warning: #f59e0b;
+            --color-danger: #ef4444;
+            --color-text: #e2e8f0;
+            --color-text-muted: #94a3b8;
+            --color-surface: #1e293b;
+            --color-border: rgba(148, 163, 184, 0.1);
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f4a 100%);
+            font-family: 'Inter', sans-serif;
+            color: var(--color-text);
+            min-height: 100vh;
+            margin: 0;
+            padding: 2rem 0;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(79, 70, 229, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(6, 182, 212, 0.06) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .glass-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--color-border);
+            border-radius: 20px;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.5);
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px rgba(0, 0, 0, 0.6);
+        }
+        
+        .header-section {
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.9), rgba(6, 182, 212, 0.7));
+            backdrop-filter: blur(10px);
+            padding: 3rem;
+            border-radius: 20px;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .header-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+        
+        .header-meta {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+        
+        .header-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .status-icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .alert-banner {
+            border-left: 4px solid;
+            padding: 1.5rem;
+            border-radius: 12px;
+            background: rgba(30, 41, 59, 0.8);
+        }
+        
+        .alert-high { border-color: var(--color-danger); }
+        .alert-medium { border-color: var(--color-warning); }
+        .alert-low { border-color: var(--color-success); }
+        
+        .metric-card {
+            text-align: center;
+            padding: 2rem 1.5rem;
+            border-radius: 16px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--color-border);
+            transition: all 0.2s;
+            height: 100%;
+        }
+        
+        .metric-card:hover {
+            background: rgba(15, 23, 42, 0.8);
+            border-color: rgba(79, 70, 229, 0.5);
+        }
+        
+        .metric-value {
+            font-size: 2.75rem;
+            font-weight: 800;
+            line-height: 1;
+            margin: 0.75rem 0;
+            background: linear-gradient(135deg, #fff, var(--color-accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .metric-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--color-text-muted);
+            font-weight: 600;
+        }
+        
+        .metric-unit {
+            font-size: 1.25rem;
+            color: var(--color-text-muted);
+            margin-left: 0.25rem;
+        }
+        
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            padding-left: 1rem;
+            border-left: 4px solid var(--color-accent);
+            color: var(--color-text);
+        }
+        
+        .uv-badge {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.75rem;
+            margin: 0 auto;
+            color: white;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .uv-low { background: linear-gradient(135deg, #10b981, #059669); }
+        .uv-mod { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .uv-high { background: linear-gradient(135deg, #f97316, #ea580c); }
+        .uv-very-high { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        
+        .info-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.5rem;
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+        }
+        
+        .info-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+        
+        .icon-blue { background: rgba(79, 70, 229, 0.2); color: var(--color-primary); }
+        .icon-cyan { background: rgba(6, 182, 212, 0.2); color: var(--color-accent); }
+        .icon-green { background: rgba(16, 185, 129, 0.2); color: var(--color-success); }
+        
+        .chart-container {
+            padding: 2rem;
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 16px;
+            border: 1px solid var(--color-border);
+        }
+        
+        .btn-back {
+            background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+            border: none;
+            padding: 1rem 3rem;
+            font-weight: 600;
+            border-radius: 12px;
+            color: white;
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-back:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5);
+            color: white;
+        }
+        
+        .risk-badge {
+            padding: 0.5rem 1.25rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-block;
+        }
+        
+        .risk-high {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        
+        .risk-med {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fcd34d;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        
+        .risk-low {
+            background: rgba(16, 185, 129, 0.2);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        
+        .recommendation-box {
+            background: rgba(79, 70, 229, 0.1);
+            border: 1px solid rgba(79, 70, 229, 0.3);
+            border-radius: 16px;
+            padding: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+        
+        .rec-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            flex-shrink: 0;
+        }
+        
+        .icon-svg {
+            width: 40px;
+            height: 40px;
+            stroke: white;
+            fill: none;
+            stroke-width: 2;
+        }
+        
+        .alert-banner h5, .alert-banner p {
+            color: var(--color-text);
+        }
+        
+        .info-row .fw-bold, .info-row .metric-label {
+            color: var(--color-text);
+        }
+        
+        .info-row .small {
+            color: var(--color-text-muted);
+        }
+        
+        .glass-card .small {
+            color: var(--color-text-muted) !important;
+        }
+        
+        .recommendation-box h5, .recommendation-box p {
+            color: var(--color-text);
+        }
+    </style>
+</head>
+<body>
+    <div class="container dashboard-container">
+        
+        <!-- Header -->
+        <div class="header-section">
+            <div class="row align-items-center">
+                <div class="col-lg-9">
+                    <div class="mb-2" style="opacity: 0.8; text-transform: uppercase; font-size: 0.875rem; letter-spacing: 1px; font-weight: 600;">Informe Técnico de Montaña</div>
+                    <h1 class="header-title">Análisis de Viabilidad</h1>
+                    <div class="header-meta mt-3">
+                        <div class="header-meta-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                            <span th:text="${#numbers.formatDecimal(lat, 1, 4)}"></span>°,
+                            <span th:text="${#numbers.formatDecimal(lon, 1, 4)}"></span>°
+                        </div>
+                        <div class="header-meta-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                            <span th:text="${result.elevation}"></span> m s.n.m.
+                        </div>
+                        <div class="header-meta-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            <span th:text="${time}"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 text-center mt-4 mt-lg-0">
+                    <div class="status-icon mx-auto" th:if="${result.sunny}">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                    </div>
+                    <div class="status-icon mx-auto" th:unless="${result.sunny}">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
+                            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+                        </svg>
+                    </div>
+                    <div class="mt-2 fw-semibold" th:text="${result.sunny ? 'Condiciones Despejadas' : 'Nublado / Sombra'}"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Banner -->
+        <div class="glass-card alert-banner mb-4" 
+             th:classappend="${result.safetyAlert.contains('ALTO') ? 'alert-high' : (result.safetyAlert.contains('Moderate') ? 'alert-medium' : 'alert-low')}">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-2 fw-bold">Diagnóstico de Seguridad</h5>
+                    <p class="mb-0" style="opacity: 0.9;" th:text="${result.safetyAlert}"></p>
+                </div>
+                <span class="risk-badge" 
+                      th:classappend="${result.safetyAlert.contains('ALTO') ? 'risk-high' : (result.safetyAlert.contains('Moderate') ? 'risk-med' : 'risk-low')}"
+                      th:text="${result.safetyAlert.contains('ALTO') ? 'Alto Riesgo' : (result.safetyAlert.contains('Moderate') ? 'Precaución' : 'Seguro')}"></span>
+            </div>
+        </div>
+
+        <!-- Metric Grid -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3 col-sm-6">
+                <div class="glass-card metric-card">
+                    <div class="metric-label">Altitud</div>
+                    <div class="metric-value"><span th:text="${result.elevation}"></span><span class="metric-unit">m</span></div>
+                    <div class="text-muted small mt-2">Sobre el nivel del mar</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="glass-card metric-card">
+                    <div class="metric-label">Temperatura</div>
+                    <div class="metric-value"><span th:text="${result.temperature}"></span><span class="metric-unit">°C</span></div>
+                    <div class="text-muted small mt-2"><span th:text="${result.thermalSensation}"></span></div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="glass-card metric-card">
+                    <div class="metric-label">Viento</div>
+                    <div class="metric-value"><span th:text="${result.windSpeed}"></span><span class="metric-unit">km/h</span></div>
+                    <div class="text-muted small mt-2">A 10m de altura</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="glass-card metric-card">
+                    <div class="metric-label">Índice UV</div>
+                    <div class="uv-badge mt-3" 
+                         th:classappend="${result.currentUvIndex > 8 ? 'uv-very-high' : (result.currentUvIndex > 5 ? 'uv-high' : (result.currentUvIndex > 2 ? 'uv-mod' : 'uv-low'))}"
+                         th:text="${result.currentUvIndex}"></div>
+                    <div class="text-muted small mt-2">Máximo del día</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mountain Technical Data -->
+        <h5 class="section-title">Condiciones Atmosféricas de Alta Montaña</h5>
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="glass-card info-row">
+                    <div class="info-icon icon-blue">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"></path>
+                            <line x1="8" y1="16" x2="8.01" y2="16"></line>
+                            <line x1="8" y1="20" x2="8.01" y2="20"></line>
+                            <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                            <line x1="12" y1="22" x2="12.01" y2="22"></line>
+                            <line x1="16" y1="16" x2="16.01" y2="16"></line>
+                            <line x1="16" y1="20" x2="16.01" y2="20"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="metric-label mb-1">Isoterma 0°C</div>
+                        <div class="fw-bold fs-4" th:text="${result.freezingLevel + ' m'}"></div>
+                        <div class="small text-warning mt-1" th:if="${result.elevation > result.freezingLevel}">
+                            <svg style="width: 14px; height: 14px; vertical-align: middle;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                            Por encima de línea de congelación
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card info-row">
+                    <div class="info-icon icon-cyan">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="metric-label mb-1">Visibilidad</div>
+                        <div class="fw-bold fs-4" th:text="${(result.visibility / 1000) + ' km'}"></div>
+                        <div class="small text-danger mt-1" th:if="${result.visibility < 1000}">
+                            <svg style="width: 14px; height: 14px; vertical-align: middle;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                            Visibilidad reducida
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card info-row">
+                    <div class="info-icon icon-green">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="metric-label mb-1">Presión Atmosférica</div>
+                        <div class="fw-bold fs-4" th:text="${result.pressure + ' hPa'}"></div>
+                        <div class="small text-muted mt-1">Nivel de oxígeno relativo</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Solar Cycle -->
+        <div class="glass-card p-4 mb-4">
+            <h5 class="section-title">Ciclo Solar</h5>
+            <div class="row text-center">
+                <div class="col-md-6 mb-3 mb-md-0">
+                    <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" style="opacity: 0.8;">
+                        <path d="M17 18a5 5 0 0 0-10 0"></path>
+                        <line x1="12" y1="2" x2="12" y2="9"></line>
+                        <line x1="4.22" y1="10.22" x2="5.64" y2="11.64"></line>
+                        <line x1="1" y1="18" x2="3" y2="18"></line>
+                        <line x1="21" y1="18" x2="23" y2="18"></line>
+                        <line x1="18.36" y1="11.64" x2="19.78" y2="10.22"></line>
+                        <line x1="23" y1="22" x2="1" y2="22"></line>
+                        <polyline points="8 6 12 2 16 6"></polyline>
+                    </svg>
+                    <div class="metric-label mt-2">Amanecer</div>
+                    <div class="fw-bold fs-3 mt-1" th:text="${result.sunrise}"></div>
+                </div>
+                <div class="col-md-6">
+                    <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" style="opacity: 0.8;">
+                        <path d="M17 18a5 5 0 0 0-10 0"></path>
+                        <line x1="12" y1="9" x2="12" y2="2"></line>
+                        <line x1="4.22" y1="10.22" x2="5.64" y2="11.64"></line>
+                        <line x1="1" y1="18" x2="3" y2="18"></line>
+                        <line x1="21" y1="18" x2="23" y2="18"></line>
+                        <line x1="18.36" y1="11.64" x2="19.78" y2="10.22"></line>
+                        <line x1="23" y1="22" x2="1" y2="22"></line>
+                        <polyline points="16 5 12 9 8 5"></polyline>
+                    </svg>
+                    <div class="metric-label mt-2">Atardecer</div>
+                    <div class="fw-bold fs-3 mt-1" th:text="${result.sunset}"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="glass-card mb-4">
+            <div class="p-4">
+                <h5 class="section-title">Evolución en las próximas 24 horas</h5>
+                <div class="chart-container">
+                    <canvas id="weatherChart" height="90"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="glass-card mb-5">
+            <div class="recommendation-box">
+                <div class="rec-icon">
+                    <svg class="icon-svg" viewBox="0 0 24 24">
+                        <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"></path>
+                        <line x1="16" y1="8" x2="2" y2="22"></line>
+                        <line x1="17.5" y1="15" x2="9" y2="15"></line>
+                    </svg>
+                </div>
+                <div>
+                    <h5 class="fw-bold mb-2">Recomendación de Equipamiento</h5>
+                    <p class="mb-0 fs-5" style="line-height: 1.6;" th:text="${result.clothingRecommendation}"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-5 mb-5">
+            <a href="/" class="btn-back">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 0.5rem;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                Nuevo Análisis
+            </a>
+        </div>
+    </div>
+
+    <!-- Chart Configuration -->
+    <script th:inline="javascript">
+        const hourlyData = [[${result.hourlyForecast}]];
+        
+        if (hourlyData && hourlyData.length > 0) {
+            const labels = hourlyData.map(h => h.time.substring(11, 16)); // Extract HH:mm
+            const temps = hourlyData.map(h => h.temperature);
+            const winds = hourlyData.map(h => h.windSpeed);
+            const uvs = hourlyData.map(h => h.uvIndex);
+
+            const ctx = document.getElementById('weatherChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Temperatura (°C)',
+                            data: temps,
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Viento (km/h)',
+                            data: winds,
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                         {
+                            label: 'UV Index',
+                            data: uvs,
+                            borderColor: '#f1c40f',
+                            borderDash: [5, 5],
+                            borderWidth: 2,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'Temp / Viento' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'UV Index' }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
