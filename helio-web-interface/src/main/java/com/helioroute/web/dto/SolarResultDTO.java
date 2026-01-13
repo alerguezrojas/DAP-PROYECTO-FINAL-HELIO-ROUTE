@@ -15,6 +15,7 @@ public class SolarResultDTO {
     private String locationDescription;
     private String locationImageUrl;
     private String wikiUrl;
+    private Double realAltitude; // Added Real Altitude for Known Peaks
 
     // New Fields
     private double elevation; // Added Elevation

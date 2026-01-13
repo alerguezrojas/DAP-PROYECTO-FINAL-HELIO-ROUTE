@@ -40,6 +40,12 @@ public class PageController {
         LocalDateTime time = LocalDateTime.parse(timeStr);
         
         SolarResultDTO result = backendService.getSolarCalculation(lat, lon, time, strategy);
+
+        // Check for known real altitude
+        Double realAlt = getRealAltitude(lat, lon);
+        if (realAlt != null) {
+            result.setRealAltitude(realAlt);
+        }
         
         // Enrich with Location Metadata
         String locationName = locationService.getLocationName(lat, lon);
@@ -71,5 +77,18 @@ public class PageController {
         model.addAttribute("time", time);
         
         return "result";
+    }
+
+    private Double getRealAltitude(double lat, double lon) {
+        if (isClose(lat, 37.050) && isClose(lon, -3.311)) return 3479.0; // Mulhacén
+        if (isClose(lat, 42.632) && isClose(lon, 0.658)) return 3404.0; // Aneto
+        if (isClose(lat, 28.272) && isClose(lon, -16.642)) return 3715.0; // Teide
+        if (isClose(lat, 40.783) && isClose(lon, -3.975)) return 2428.0; // Peñalara
+        if (isClose(lat, 27.988) && isClose(lon, 86.925)) return 8849.0; // Everest
+        return null;
+    }
+
+    private boolean isClose(double a, double b) {
+        return Math.abs(a - b) < 0.005;
     }
 }

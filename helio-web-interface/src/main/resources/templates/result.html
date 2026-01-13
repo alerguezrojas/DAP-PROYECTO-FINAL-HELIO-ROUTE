@@ -467,9 +467,10 @@
         <div class="row g-3 mb-4">
             <div class="col-md-3 col-sm-6">
                 <div class="glass-card metric-card">
-                    <div class="metric-label">Altitud</div>
+                    <div class="metric-label">Altitud del Modelo</div>
                     <div class="metric-value"><span th:text="${result.elevation}"></span><span class="metric-unit">m</span></div>
-                    <div class="text-muted small mt-2">Sobre el nivel del mar</div>
+                    <div class="text-muted small mt-2">Dato del Modelo</div>
+                    <div class="small fw-bold text-info mt-1" th:if="${result.realAltitude != null}" th:text="'Topográfica: ' + ${#numbers.formatInteger(result.realAltitude, 0)} + ' m'"></div>
                 </div>
             </div>
             <div class="col-md-3 col-sm-6">
@@ -671,7 +672,7 @@
             </thead>
             <tbody>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">Altitud</td>
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">Altitud del Modelo</td>
                     <td id="pdf-elevation" style="padding: 10px; border: 1px solid #ddd;"></td>
                     <td style="padding: 10px; border: 1px solid #ddd; color: #64748b;">Sobre el nivel del mar</td>
                 </tr>
@@ -765,6 +766,7 @@
                     lon: [[${lon}]],
                     time: [[${time}]],
                     elevation: [[${result.elevation}]],
+                    realAltitude: [[${result.realAltitude}]],
                     temperature: [[${result.temperature}]],
                     thermalSensation: [[${result.thermalSensation}]],
                     windSpeed: [[${result.windSpeed}]],
@@ -888,7 +890,10 @@
                      addSection("1. Ubicación y Fecha");
                      addLine("Lugar", resultData.locationName);
                      addLine("Coordenadas", `${Number(resultData.lat).toFixed(4)}, ${Number(resultData.lon).toFixed(4)}`);
-                     addLine("Altitud", `${resultData.elevation} m`);
+                     if (resultData.realAltitude) {
+                        addLine("Altitud Topográfica", `${resultData.realAltitude} m`);
+                     }
+                     addLine("Altitud del Modelo", `${resultData.elevation} m`);
                      addLine("Fecha Informe", resultData.time);
 
                      addSection("2. Meteorología");
